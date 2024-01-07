@@ -98,5 +98,26 @@ provider_installation {
   }
 }
 ```
-6) 
+6) Далее была создана папка "cloud-terraform". В этой папке был создан конфигурационный файл main.tf 
+В начале этого файла были добавлены следующие блоки:
+```
+terraform {
+  required_providers {
+    yandex = {
+      source = "yandex-cloud/yandex"
+    }
+  }
+  required_version = ">= 0.13"
+}
 
+provider "yandex" {
+  zone = "ru-central1-b"
+}
+
+```
+Затем в папке  с конфигурационным файлом main.tf была выполнена команда terraform init для инициализации провайдера.
+```
+cd ~/cloud-terraform
+terraform init
+```
+![terraform init](./img/1.png)
