@@ -9,21 +9,24 @@
 3) Затем был установлен интерфейс командной строки Yandex Cloud (CLI).
 
 ```
-sudo apt install curl -y
-curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
-source "/home/boris/.bashrc"
+sudo apt install curl -y;
+curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash;
 ```
-Далее чтобы начать настройку профиля CLI, была выполнена команда:
+После завершения установки была перезапщена командная оболочка:
+```
+source ~/.bashrc;
+```
+Далее был получен OAuth-токен в сервисе Яндекс ID. Срок жизни OAuth-токена 1 год. После этого необходимо получить новый OAuth-токен и повторить процедуру аутентификации.
 
+Затем, чтобы начать настройку профиля CLI, была выполнена команда:
 ```
-yc init
+yc init;
 ```
-Далее был получен OAuth-токен в сервисе Яндекс ID. Срок жизни OAuth-токена 1 год. После этого необходимо получить новый OAuth-токен
-и повторить процедуру аутентификации. Было выбрано облако и каталог по умолчанию.
+В процессе настройки профиля CLI был указан OAuth-токен, затем были выбраны облако и каталог по умолчанию.
 
 4) Далее был создан сервисный аккаунт
 ```
-yc iam service-account create --name bsr
+yc iam service-account create --name <имя_сервисного_аккаунта>
 ```
 
 Чтобы узнать идентификатор сервисного аккаунта (столбец ID), была выполнена команда:
@@ -38,6 +41,7 @@ yc resource-manager folder add-access-binding default \
   --role admin \
   --subject serviceAccount:<идентификатор_сервисного_аккаунта>
 ```
+ajeasaraletivkbtdi6s
 
 Далее был настроен профиль CLI для выполнения операций от имени сервисного аккаунта. Был создан авторизованный ключ для сервисного аккаунта.
 
@@ -50,7 +54,7 @@ yc iam key create \
 Затем был создан профиль CLI для выполнения операций от имени сервисного аккаунта.
 
 ```
-yc config profile create bsr-terraform
+yc config profile create bsr-ya-cli
 ```
 
 Далее была задана конфигурация профиля:
@@ -63,7 +67,7 @@ yc config set folder-id <идентификатор_каталога>
 Теперь можно получить IAM-токен и записать его в переменную окружения:
 
 ```
-export TF_VAR_oauth_token=`(yc iam create-token)`;
+export TF_VAR_iam_token=`(yc iam create-token)`;
 ```
 
 
