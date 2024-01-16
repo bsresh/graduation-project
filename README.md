@@ -532,9 +532,72 @@ resource "yandex_dns_recordset" "rs-2" {
 cd ~/cloud-terraform
 terraform validate
 ```
-![terraform init](./img/terraform_validate.png)
+![terraform validate](./img/terraform_validate.png)
 
 Применение изменения конфигурации:
 ```
 terraform -auto-approve=true apply
 ```
+## Установка Ansible
+```
+sudo apt update
+sudo apt install ansible
+```
+Далее создадим папку ~/ansible. И в этой папке создадим конфигурационный файл ansible.cfg со следующим содержимым:
+
+```
+[defaults]
+# проверка ключей при подключении по SSH отключена
+host_key_checking = False
+# расположение файла inventory
+inventory = inventory.ini
+# пользователь, которым подключаемся по ssh
+remote_user = user
+# отключает сбор фактов
+gathering = explicit
+# количество хостов, на которых текущая задача выполняется одновременно
+forks = 5
+[privilege_escalation]
+# требуется повышение прав
+become = True
+# пользователь, под которым будут выполняться 
+become_user = root
+# способ повышения прав
+become_method = sudo
+```
+Параметр host_key_checking отвечает за проверку ключей при подключении по SSH. Если указать в конфигурационном файле host_key_checking=False, проверка будет отключена. Это полезно, когда с управляющего хоста Ansible надо подключиться к большому количеству устройств первый раз.
+
+Проверим установлен ли Ansible, проверим версию, подключён ли конфигурационный файл. Для этого выполним команду: 
+```
+cd ~/ansible
+ansible --version
+```
+![ansible --version](./img/ansible_--version.png)
+
+Далее в папке ~/ansible был создан файл inventory.ini со следующим содержимым:
+
+```
+[bastion]
+<IP-vm-bastion-host> ansible_ssh_user=user
+
+[webservers:children]
+web1
+web2
+
+[web1]
+web-server-1.ru-central1.internal ansible_ssh_user=user
+[web2]
+web-server-2.ru-central1.internal ansible_ssh_user=user
+
+[webservers:vars]
+ansible_ssh_common_args='-o ProxyCommand="ssh -p 22 -W %h:%p -q user@<IP-vm-bastion-host>"'
+```
+Вместо "<IP-vm-bastion-host>" указывается ip-адрес виртуальной машины, реализующей концепцию bastion host
+Для webservers используются fqdn имена виртуальных машин в зоне ".ru-central1.internal". 
+Подключение ansible к серверам через bastion host осуществляется с помощью ProxyCommand 
+
+Проверим доступность хостов с помощью модуля ping.
+```
+ansible all -m ping
+```
+![ansible all -m ping](./img/ansible_ping.png)
