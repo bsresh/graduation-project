@@ -127,7 +127,7 @@ terraform init
 Конфигурационные файлы находятся в папке terraform_config_files/cloud-terraform. План инфраструктуры описан в конфигурационном файле main.tf Переменные описаны в файле variables.tf В файле terraform.tfvars заданы значения переменных. В файле outputs.tf описаны выходные переменные. В файле meta.yml находятся метаданные создаваемой виртуальной машины.
 
 ### Настройка сети
-Сначала была выполнена настройка сети. Была развёрнута облачная сеть network-1, в которой были созданы 3 подсети subnet-1, subnet-2, subnet-3. Подсети subnet-1 и subnet-2 были размещены в зоне доступности ru-central1-b. Подсеть subnet-3 была размещена в зоне доступности ru-central1-a.
+Сначала была выполнена настройка сети. Была развёрнута облачная сеть network-1, в которой были созданы 3 подсети subnet-1, subnet-2, subnet-3. Подсети subnet-1 и subnet-2 были размещены в зоне доступности ru-central1-b. Подсеть subnet-3 была размещена в зоне доступности ru-central1-a. Был создан nat-шлюз nat-gateway и таблица маршрутизации rt, направляющая исходящий трафик на nat-шлюз. Эта таблица маршрутизации rt была привязана к подсетям subnet-2 и subnet-3. Виртуальные машины в подсетях subnet-2 и subnet-3 не имеют публичных ip-адресов, но имеют доступ в интернет через NAT-шлюз.
 
 ```
 resource "yandex_vpc_network" "network-1" {
@@ -158,7 +158,21 @@ resource "yandex_vpc_subnet" "subnet-3" {
   route_table_id = yandex_vpc_route_table.rt.id
 }
 
+resource "yandex_vpc_gateway" "nat_gateway" {
+  name = "nat-gateway"
+  shared_egress_gateway {}
+}
+resource "yandex_vpc_route_table" "rt" {
+  name       = "rt"
+  network_id = yandex_vpc_network.network-1.id
+  static_route {
+    destination_prefix = "0.0.0.0/0"
+    gateway_id         = yandex_vpc_gateway.nat_gateway.id
+  }
+}
 ```
+
+![Карта сети](./img/network_map.png)
 
 ### Создание группы безопасности для бастионного хоста
 Была создана группа безопасности sg-bastion-host для бастионного хоста со следующими правилами:
@@ -601,3 +615,75 @@ ansible_ssh_common_args='-o ProxyCommand="ssh -p 22 -W %h:%p -q user@<IP-vm-bast
 ansible all -m ping
 ```
 ![ansible all -m ping](./img/ansible_ping.png)
+
+## Копирование сайта на группу web-серверов.
+
+Контент сайта размещён на github: https://github.com/bsresh/tsukushi.git 
+
+Скопируем сайт с github на web-серверы при помощи ansible.
+
+Был создан playbook с ролями:
+
+```
+---
+- name: "copy content"
+  hosts: 
+  - webservers
+  gather_facts: false
+  become: yes
+  tags:
+  - content
+  roles: 
+    - name: install_git
+    - name: copy_site
+      vars:
+      - repo_link: https://github.com/bsresh/tsukushi.git
+      - dest_folder: /var/www/html/
+```
+
+Роль устанавливает веб-сервер Nginx на управляемые хосты:
+
+```
+---
+# tasks file for install_git
+- name: "Update apt packages"
+  apt: 
+    update_cache: yes
+    force_apt_get: yes
+    cache_valid_time: 86400
+- name: "Upgrade apt packages"
+  apt:
+    state: latest
+    force_apt_get: yes
+- name: "install git"
+  apt:
+    name:
+      - git
+    state: latest
+```
+
+Роль очищает папку назначения от старых файлов и копирует в неё сайт:
+```
+---
+# tasks file for copy_site
+- name: "Delete content"
+  file:
+    state: absent
+    path: "{{dest_folder}}"
+- name: "copy site"
+  git:
+    repo: "{{repo_link}}"
+    dest: "{{dest_folder}}"
+    clone: yes
+    update: yes
+```
+![ansible-playbook.png playbook.yml](./img/ansible-playbook.png)
+
+Протестируем сайт:
+
+```
+curl -v tsukushi.ru
+```
+![curl -v tsukushi.ru](./img/curl.png)
+
+![tsukushi.ru](./img/tsukushi.ru.png)

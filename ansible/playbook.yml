@@ -1,0 +1,14 @@
+---
+- name: "copy content"
+  hosts: 
+  - webservers
+  gather_facts: false
+  become: yes
+  tags:
+  - content
+  roles: 
+    - name: install_git
+    - name: copy_site
+      vars:
+      - repo_link: https://github.com/bsresh/tsukushi.git
+      - dest_folder: /var/www/html/

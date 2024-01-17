@@ -1,0 +1,12 @@
+---
+# tasks file for copy_site
+- name: "Delete content"
+  file:
+    state: absent
+    path: "{{dest_folder}}"
+- name: "copy site"
+  git:
+    repo: "{{repo_link}}"
+    dest: "{{dest_folder}}"
+    clone: yes
+    update: yes

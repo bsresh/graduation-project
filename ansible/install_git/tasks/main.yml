@@ -1,0 +1,16 @@
+---
+# tasks file for install_git
+- name: "Update apt packages"
+  apt: 
+    update_cache: yes
+    force_apt_get: yes
+    cache_valid_time: 86400
+- name: "Upgrade apt packages"
+  apt:
+    state: latest
+    force_apt_get: yes
+- name: "install git"
+  apt:
+    name:
+      - git
+    state: latest
