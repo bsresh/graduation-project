@@ -3,9 +3,6 @@
 locals {
   sa_name      = "ig-sa"
   network_name = "network1"
-  subnet_name1 = "subnet-1"
-  subnet_name2 = "subnet-2"
-  subnet_name3 = "subnet-3"
 }
 
 # Настройка провайдера
@@ -26,6 +23,7 @@ provider "yandex" {
   zone      = "ru-central1-b"
 }
 
+
 # Создание сервисного аккаунта. Все операции в Instance Groups будут выполняются от имени этого сервисного аккаунта.
 
 resource "yandex_iam_service_account" "ig-sa" {
@@ -33,13 +31,16 @@ resource "yandex_iam_service_account" "ig-sa" {
   description = "service account to manage instance groups"
 }
 
+
 # Создание роли для сервисного аккаунта. Чтобы иметь возможность создавать, обновлять и удалять ВМ в группе, сервисному аккаунту назначается роль editor.
 
 resource "yandex_resourcemanager_folder_iam_member" "editor" {
   folder_id = var.folder_id
   role      = "editor"
   member    = "serviceAccount:${yandex_iam_service_account.ig-sa.id}"
+  depends_on     = [yandex_iam_service_account.ig-sa]
 }
+
 
 /*Настройка сети*/
 
@@ -48,29 +49,6 @@ resource "yandex_vpc_network" "network-1" {
   name = local.network_name
 }
 
-resource "yandex_vpc_subnet" "subnet-1" {
-  name           = local.subnet_name1
-  zone           = "ru-central1-b"
-  network_id     = yandex_vpc_network.network-1.id
-  v4_cidr_blocks = ["172.16.0.0/24"]
-}
-
-resource "yandex_vpc_subnet" "subnet-2" {
-  name           = local.subnet_name2
-  zone           = "ru-central1-b"
-  network_id     = yandex_vpc_network.network-1.id
-  v4_cidr_blocks = ["172.16.1.0/24"]
-  route_table_id = yandex_vpc_route_table.rt.id
-
-}
-
-resource "yandex_vpc_subnet" "subnet-3" {
-  name           = local.subnet_name3
-  zone           = "ru-central1-a"
-  network_id     = yandex_vpc_network.network-1.id
-  v4_cidr_blocks = ["172.16.2.0/24"]
-  route_table_id = yandex_vpc_route_table.rt.id
-}
 
 # Создание NAT-шлюза
 
@@ -89,7 +67,50 @@ resource "yandex_vpc_route_table" "rt" {
     destination_prefix = "0.0.0.0/0"
     gateway_id         = yandex_vpc_gateway.nat_gateway.id
   }
+  depends_on     = [
+    yandex_vpc_network.network-1,
+    yandex_vpc_gateway.nat_gateway
+    ]
 }
+
+
+
+resource "yandex_vpc_subnet" "subnet-1" {
+  name           = "subnet-1"
+  zone           = "ru-central1-a"
+  network_id     = yandex_vpc_network.network-1.id
+  v4_cidr_blocks = ["172.16.1.0/24"]
+  route_table_id = yandex_vpc_route_table.rt.id
+  depends_on     = [
+    yandex_vpc_network.network-1,
+    yandex_vpc_route_table.rt
+    ]
+}
+
+
+resource "yandex_vpc_subnet" "subnet-2" {
+  name           = "subnet-2"
+  zone           = "ru-central1-b"
+  network_id     = yandex_vpc_network.network-1.id
+  v4_cidr_blocks = ["172.16.2.0/24"]
+  route_table_id = yandex_vpc_route_table.rt.id
+  depends_on     = [yandex_vpc_network.network-1,
+                   yandex_vpc_route_table.rt
+                   ]
+}
+
+
+resource "yandex_vpc_subnet" "subnet-3" {
+  name           = "subnet-3"
+  zone           = "ru-central1-d"
+  network_id     = yandex_vpc_network.network-1.id
+  v4_cidr_blocks = ["172.16.15.0/24"]
+  route_table_id = yandex_vpc_route_table.rt.id
+  depends_on     = [yandex_vpc_network.network-1,
+                    yandex_vpc_route_table.rt
+                   ]
+}
+
 
 /* Создание образов загрузочных дисков */
 
@@ -98,74 +119,13 @@ resource "yandex_compute_image" "web_server" {
   source_family = "lemp"
 }
 
-resource "yandex_compute_image" "bastion_host" {
-  name          = "bastion-host"
+
+resource "yandex_compute_image" "debian-11" {
+  name          = "debian-11"
   source_family = "debian-11"
 }
 
-/*Создание группы безопасности для бастионного хоста*/
 
-resource "yandex_vpc_security_group" "sg-bastion-host" {
-  name        = "sg-bastion-host"
-  description = "This rule allows access to the bastion host from the internet"
-  network_id  = yandex_vpc_network.network-1.id
-
-  ingress {
-    protocol       = "TCP"
-    description    = "SSH"
-    v4_cidr_blocks = ["0.0.0.0/0"]
-    port           = 22
-  }
-
-  egress {
-    protocol       = "ANY"
-    description    = "any"
-    v4_cidr_blocks = ["0.0.0.0/0"]
-    from_port      = 1
-    to_port        = 65535
-  }
-
-}
-
-
-/*Создание и настройка бастионного хоста*/
-
-
-resource "yandex_compute_instance" "vm-bastion-host" {
-  name                      = "vm-bastion-host"
-  platform_id               = "standard-v2"
-  allow_stopping_for_update = true
-  hostname                  = "bastion"
-
-  resources {
-    core_fraction = 5
-    cores         = 2
-    memory        = 1
-  }
-
-  scheduling_policy {
-    preemptible = true
-  }
-
-  boot_disk {
-    initialize_params {
-      image_id = yandex_compute_image.bastion_host.id
-      size     = 3
-      type     = "network-hdd"
-    }
-  }
-
-  network_interface {
-    subnet_id          = yandex_vpc_subnet.subnet-1.id
-    nat                = true
-    security_group_ids = [yandex_vpc_security_group.sg-bastion-host.id]
-  }
-
-  metadata = {
-    user-data = file("./meta.yml")
-  }
-
-}
 
 /*Создание группы безопасности для L7-балансировщика*/
 
@@ -202,6 +162,7 @@ resource "yandex_vpc_security_group" "alb-sg" {
     predefined_target = "loadbalancer_healthchecks"
     port              = 30080
   }
+  depends_on     = [yandex_vpc_network.network-1]
 }
 
 
@@ -225,6 +186,13 @@ resource "yandex_vpc_security_group" "alb-vm-sg" {
     port           = 22
   }
 
+  ingress {
+    protocol       = "ANY"
+    description    = "zabbix"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    port           = 10050
+  }
+
   egress {
     protocol       = "ANY"
     description    = "any"
@@ -232,8 +200,10 @@ resource "yandex_vpc_security_group" "alb-vm-sg" {
     from_port      = 1
     to_port        = 65535
   }
-
-
+  depends_on     = [
+    yandex_vpc_network.network-1,
+    yandex_vpc_security_group.alb-sg
+    ]
 }
 
 
@@ -269,7 +239,7 @@ resource "yandex_compute_instance_group" "alb-vm-group" {
     hostname = "web-server-{instance.index}"
     network_interface {
       network_id         = yandex_vpc_network.network-1.id
-      subnet_ids         = [yandex_vpc_subnet.subnet-2.id, yandex_vpc_subnet.subnet-3.id]
+      subnet_ids         = [yandex_vpc_subnet.subnet-1.id, yandex_vpc_subnet.subnet-2.id]
       nat                = false
       security_group_ids = [yandex_vpc_security_group.alb-vm-sg.id]
     }
@@ -280,18 +250,6 @@ resource "yandex_compute_instance_group" "alb-vm-group" {
   }
 
   scale_policy {
-
-    /*
-    auto_scale {
-      initial_size           = 2
-      measurement_duration   = 60
-      max_size               = 3
-      min_zone_size          = 1
-      cpu_utilization_target = 75
-      warmup_duration        = 60
-      stabilization_duration = 120
-    }
-    */
 
     fixed_scale {
       size = 2
@@ -313,9 +271,22 @@ resource "yandex_compute_instance_group" "alb-vm-group" {
     target_group_description = "load balancer target group"
   }
 
+  depends_on = [
+    yandex_iam_service_account.ig-sa,
+    yandex_resourcemanager_folder_iam_member.editor,
+    yandex_vpc_security_group.alb-vm-sg,
+    yandex_compute_image.web_server,
+    yandex_vpc_subnet.subnet-1,
+    yandex_vpc_subnet.subnet-2,
+    yandex_vpc_subnet.subnet-3
+  ]
+
 }
 
+
 /* Создание группы бекендеров */
+
+
 resource "yandex_alb_backend_group" "alb-bg" {
   name = "alb-bg"
 
@@ -332,14 +303,19 @@ resource "yandex_alb_backend_group" "alb-bg" {
       }
     }
   }
+  depends_on = [yandex_compute_instance_group.alb-vm-group]
 }
 
 /* Создание HTTP роутера */
+
 resource "yandex_alb_http_router" "alb-router" {
   name = "alb-router"
+  depends_on = [yandex_alb_backend_group.alb-bg]
 }
 
+
 /* Создание виртуального хоста */
+
 resource "yandex_alb_virtual_host" "alb-host" {
   name           = "alb-host"
   http_router_id = yandex_alb_http_router.alb-router.id
@@ -352,44 +328,20 @@ resource "yandex_alb_virtual_host" "alb-host" {
       }
     }
   }
+  depends_on = [yandex_alb_http_router.alb-router]
 }
 
-/* Создание L7-балансировщика */
 
-resource "yandex_alb_load_balancer" "alb-1" {
-  name               = "alb-1"
-  network_id         = yandex_vpc_network.network-1.id
-  security_group_ids = [yandex_vpc_security_group.alb-sg.id]
+/* Выпуск сертификата */
 
-  allocation_policy {
-    location {
-      zone_id   = "ru-central1-a"
-      subnet_id = yandex_vpc_subnet.subnet-3.id
-    }
-
-    location {
-      zone_id   = "ru-central1-b"
-      subnet_id = yandex_vpc_subnet.subnet-2.id
-    }
-
-  }
-
-  listener {
-    name = "alb-listener"
-    endpoint {
-      address {
-        external_ipv4_address {
-        }
-      }
-      ports = [80]
-    }
-    http {
-      handler {
-        http_router_id = yandex_alb_http_router.alb-router.id
-      }
-    }
+resource "yandex_cm_certificate" "le-certificate" {
+  name    = "le-certificate"
+  domains = [var.domain]
+  managed {
+  challenge_type = "DNS_CNAME"
   }
 }
+
 
 /* Добавление зоны */
 
@@ -400,6 +352,105 @@ resource "yandex_dns_zone" "alb-zone" {
   public      = true
 }
 
+/* Валидация сертфиката */
+
+resource "yandex_dns_recordset" "validation-record" {
+  zone_id = yandex_dns_zone.alb-zone.id
+  name    = yandex_cm_certificate.le-certificate.challenges[0].dns_name
+  type    = yandex_cm_certificate.le-certificate.challenges[0].dns_type
+  data    = [yandex_cm_certificate.le-certificate.challenges[0].dns_value]
+  ttl     = 300
+  depends_on = [yandex_cm_certificate.le-certificate,
+                yandex_dns_zone.alb-zone
+               ]
+}
+
+data "yandex_cm_certificate" "cert" {
+  depends_on      = [yandex_dns_recordset.validation-record]
+  certificate_id  = yandex_cm_certificate.le-certificate.id
+  wait_validation = true
+}
+
+# Использование data.yandex_cm_certificate.cert.id, для получения действительного сертификата.
+
+output "cert-id" {
+  description = "Certificate ID"
+  value       = data.yandex_cm_certificate.cert.id
+}
+
+
+
+/* Создание L7-балансировщика */
+
+
+resource "yandex_alb_load_balancer" "alb-1" {
+  name               = "alb-1"
+  network_id         = yandex_vpc_network.network-1.id
+  security_group_ids = [yandex_vpc_security_group.alb-sg.id]
+
+  allocation_policy {
+    location {
+      zone_id   = "ru-central1-a"
+      subnet_id = yandex_vpc_subnet.subnet-1.id
+    }
+
+    location {
+      zone_id   = "ru-central1-b"
+      subnet_id = yandex_vpc_subnet.subnet-2.id
+    }
+
+  }
+
+# data.yandex_cm_certificate.cert.id
+
+  listener {
+    name = "alb-listener"
+    endpoint {
+      address {
+        external_ipv4_address {
+        }
+      }
+      ports = [443]
+    }
+    
+    tls {
+      default_handler {
+        certificate_ids = [data.yandex_cm_certificate.cert.id]
+        http_handler {
+          http_router_id = yandex_alb_http_router.alb-router.id
+          }
+        }
+    }
+    
+    
+  }
+
+
+
+  listener {
+    name = "redirect"
+    endpoint {
+      address {
+        external_ipv4_address {
+        }
+      }
+      ports = [80]
+    }
+
+    http {
+      redirects {
+        http_to_https = true
+      }
+    }
+
+  }
+
+  depends_on = [yandex_alb_virtual_host.alb-host,
+               yandex_vpc_security_group.alb-sg
+               ]
+}
+
+
 /* Добавление ресурсных записей */
 
 resource "yandex_dns_recordset" "rs-1" {
@@ -408,6 +459,10 @@ resource "yandex_dns_recordset" "rs-1" {
   ttl     = 600
   type    = "A"
   data    = [yandex_alb_load_balancer.alb-1.listener[0].endpoint[0].address[0].external_ipv4_address[0].address]
+  depends_on = [
+                yandex_dns_zone.alb-zone,
+                yandex_alb_load_balancer.alb-1
+                ]
 }
 
 
@@ -417,4 +472,197 @@ resource "yandex_dns_recordset" "rs-2" {
   ttl     = 600
   type    = "CNAME"
   data    = [var.domain]
+    depends_on = [
+                yandex_dns_zone.alb-zone,
+                yandex_alb_load_balancer.alb-1
+                ]
 }
+
+
+
+/*********************************************************************************************************************************/
+/**************************БАСТИОННЫЙ ХОСТ****************************************************************************************/
+/*********************************************************************************************************************************/
+
+resource "yandex_vpc_subnet" "subnet-bastion" {
+  name           = "subnet-bastion"
+  zone           = "ru-central1-b"
+  network_id     = yandex_vpc_network.network-1.id
+  v4_cidr_blocks = ["172.16.0.0/24"]
+  depends_on     = [yandex_vpc_network.network-1]
+}
+
+/*Создание группы безопасности для бастионного хоста*/
+
+resource "yandex_vpc_security_group" "sg-bastion-host" {
+  name        = "sg-bastion-host"
+  description = "This rule allows access to the bastion host from the internet"
+  network_id  = yandex_vpc_network.network-1.id
+
+  ingress {
+    protocol       = "TCP"
+    description    = "SSH"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    port           = 22
+  }
+
+  ingress {
+    protocol       = "TCP"
+    description    = "zabbix"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    port           = 10050
+  }
+
+  egress {
+    protocol       = "ANY"
+    description    = "any"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    from_port      = 1
+    to_port        = 65535
+  }
+  depends_on     = [yandex_vpc_network.network-1]
+}
+
+
+/*Создание и настройка бастионного хоста*/
+
+resource "yandex_compute_instance" "vm-bastion-host" {
+  name                      = "vm-bastion-host"
+  platform_id               = "standard-v2"
+  zone = "ru-central1-b"
+  allow_stopping_for_update = true
+  hostname                  = "bastion"
+
+  resources {
+    core_fraction = 5
+    cores         = 2
+    memory        = 1
+  }
+
+  scheduling_policy {
+    preemptible = true
+  }
+
+  boot_disk {
+    initialize_params {
+      image_id = yandex_compute_image.debian-11.id
+      size     = 3
+      type     = "network-hdd"
+    }
+  }
+
+  network_interface {
+    subnet_id          = yandex_vpc_subnet.subnet-bastion.id
+    nat                = true
+    security_group_ids = [yandex_vpc_security_group.sg-bastion-host.id]
+  }
+
+  metadata = {
+    user-data = file("./meta.yml")
+  }
+  
+  depends_on = [
+    yandex_compute_image.debian-11,
+    yandex_vpc_subnet.subnet-bastion,
+    yandex_vpc_security_group.sg-bastion-host
+    ]
+
+}
+
+
+/*********************************************************************************************************************************/
+/*******************************************ZABBIX*******************************************************************************/
+/*********************************************************************************************************************************/
+
+
+
+/*Создание и настройка группы безопасности для zabbix*/
+
+resource "yandex_vpc_security_group" "sg-zabbix" {
+  name        = "sg-zabbix"
+  description = "This rule for zabbix"
+  network_id  = yandex_vpc_network.network-1.id
+
+  ingress {
+    protocol       = "TCP"
+    description    = "webgui"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    port      = 80
+  }
+
+  ingress {
+    protocol       = "TCP"
+    description    = "https"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    port      = 8080
+  }
+
+  ingress {
+    protocol       = "TCP"
+    description    = "https"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    port      = 443
+  }
+
+  ingress {
+    protocol       = "TCP"
+    description    = "ssh"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    port      = 22
+  }
+
+  egress {
+    protocol       = "ANY"
+    description    = "any"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    from_port      = 1
+    to_port        = 65535
+  }
+  depends_on     = [yandex_vpc_network.network-1]
+}
+
+/*Создание и настройка zabbix*/
+
+resource "yandex_compute_instance" "vm-zabbix" {
+  name                      = "vm-zabbix"
+  platform_id               = "standard-v2"
+  zone                      = "ru-central1-d"
+  allow_stopping_for_update = true
+  hostname                  = "zabbix"
+
+  resources {
+    core_fraction = 50
+    cores         = 2
+    memory        = 2
+  }
+
+  scheduling_policy {
+    preemptible = true
+  }
+
+  boot_disk {
+    initialize_params {
+      image_id = yandex_compute_image.debian-11.id
+      size     = 20
+      type     = "network-hdd"
+    }
+  }
+
+  network_interface {
+    subnet_id          = yandex_vpc_subnet.subnet-3.id
+    nat                = true
+    security_group_ids = [yandex_vpc_security_group.sg-zabbix.id]
+  }
+
+  metadata = {
+    user-data = file("./meta.yml")
+  }
+
+  depends_on = [
+    yandex_vpc_security_group.sg-zabbix,
+    yandex_compute_image.debian-11,
+    yandex_vpc_subnet.subnet-3
+    ]
+
+}
+

@@ -1,8 +1,67 @@
 ---
+- name: "install docker and docker compose"
+  hosts: 
+  - zabbix
+  gather_facts: no
+  become: yes
+  tags:
+  - install_docker
+  - install_docker_compose
+  - docker
+  - docker_compose_zabbix
+  roles: 
+    - name: install_docker
+
+- name: "docker-compose zabbix-host"
+  hosts:
+  - zabbix
+  gather_facts: yes
+  become: yes
+  tags:
+  - docker_compose_zabbix
+  roles: 
+    - name: docker_compose_zabbix
+      vars:
+      - folder: /home/user/zabbix/
+      - src: /home/boris/zabbix/docker-compose.yml
+      - dest: /home/user/zabbix/docker-compose.yml
+
+- name: zabbix-agent
+  hosts:
+  - bastion
+  - webservers
+  gather_facts: yes
+  become: yes
+  tags:
+  - zabbix_agent
+  roles:
+    - role: community.zabbix.zabbix_agent
+      zabbix_agent_version: 6.2
+      zabbix_agent_server: zabbix.ru-central1.internal
+
+- name: firewall zabbix agent
+  hosts:
+  - webservers
+  gather_facts: yes
+  become: yes
+  tags:
+  - firewall_zabbix_agent
+  tasks:
+    - name: firewall zabbix agent
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: 10050
+        jump: ACCEPT
+    - name: Save current state of the firewall in system file
+      community.general.iptables_state:
+        state: saved
+        path: /etc/iptables/rules.v4
+
 - name: "copy content"
   hosts: 
   - webservers
-  gather_facts: false
+  gather_facts: yes
   become: yes
   tags:
   - content
