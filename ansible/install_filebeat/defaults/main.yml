@@ -1,0 +1,5 @@
+---
+# defaults file for install_filebeat
+username: <login>
+password: <password>
+dir: /home/user/

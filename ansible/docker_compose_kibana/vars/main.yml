@@ -1,0 +1,5 @@
+---
+# vars file for docker_compose_kibana
+src: docker-compose-kibana
+dest: /home/user/
+project_dir: /home/user/docker-compose-kibana

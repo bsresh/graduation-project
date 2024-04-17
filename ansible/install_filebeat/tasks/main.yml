@@ -1,0 +1,78 @@
+---
+#tasks file for install_filebeat
+- name: "Update apt packages"
+  apt: 
+    update_cache: yes
+    force_apt_get: yes
+    cache_valid_time: 86400
+
+- name: "Upgrade apt packages"
+  apt:
+    state: latest
+    force_apt_get: yes
+
+- name: "copy GPG-KEY-elasticsearch file"
+  copy:
+    src: GPG-KEY-elasticsearch
+    dest: "{{dir}}"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: install dependencies
+  apt:
+    name: "{{item}}"
+    state: present
+    update_cache: yes
+  loop:
+    - apt-transport-https
+    - gnupg
+
+- name: add GPG key
+  apt_key:
+    file: "{{dir}}GPG-KEY-elasticsearch"
+    state: present
+
+- name: add elastic repository to apt
+  apt_repository:
+    repo: deb [trusted=yes] https://mirror.yandex.ru/mirrors/elastic/7/ stable main
+    state: present
+
+- name: "Update apt packages"
+  apt: 
+    update_cache: yes
+    force_apt_get: yes
+    cache_valid_time: 86400
+
+- name: "install filebeat"
+  apt:
+    name:
+      - filebeat
+    state: latest
+
+- name: "check filebeat is active"
+  service:
+    name: filebeat
+    state: started
+    enabled: yes
+
+- name: Populate service facts
+  ansible.builtin.service_facts:
+
+- name: "Show hostnames"
+  debug:
+    msg: "Hostname: {{ansible_hostname}}"
+
+- name: Create configuration file filebeat.yml using Jinja2
+  template:
+    src: filebeat.yml.j2
+    dest: /etc/filebeat/filebeat.yml
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: "restart filebeat"
+  service:
+    name: filebeat
+    state: restarted
+    enabled: yes

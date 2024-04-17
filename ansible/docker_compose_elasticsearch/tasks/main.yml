@@ -1,0 +1,15 @@
+---
+#tasks file for docker_compose elasticsearch
+- name: "copy project"
+  copy:
+    src: "{{src}}"
+    dest: "{{dest}}"
+
+- name: "Create and start services"
+  community.docker.docker_compose_v2:
+    project_src: "{{project_dir}}"
+  register: output
+
+- name: print home_dirs variable
+  ansible.builtin.debug:
+    var: output

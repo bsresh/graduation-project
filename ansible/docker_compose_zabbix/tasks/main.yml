@@ -1,18 +1,13 @@
 ---
-#tasks file for docker_compose_zabbix
-- name: "сreate directory"
-  file:
-    path: "{{folder}}"
-    state: "directory"
-
-- name: "copy file"
+#tasks file for docker_compose
+- name: "copy project"
   copy:
     src: "{{src}}"
     dest: "{{dest}}"
 
-- name: Create and start services
+- name: "Create and start services"
   community.docker.docker_compose_v2:
-    project_src: "{{folder}}"
+    project_src: "{{project_dir}}"
   register: output
 
 - name: print home_dirs variable

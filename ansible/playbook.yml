@@ -1,51 +1,42 @@
 ---
-- name: "install docker and docker compose"
+- name: install docker and docker compose
   hosts: 
-  - zabbix
+    - zabbix
+    - elasticsearch
+    - kibana
   gather_facts: no
   become: yes
-  tags:
-  - install_docker
-  - install_docker_compose
-  - docker
-  - docker_compose_zabbix
   roles: 
     - name: install_docker
 
-- name: "docker-compose zabbix-host"
-  hosts:
-  - zabbix
-  gather_facts: yes
-  become: yes
-  tags:
-  - docker_compose_zabbix
-  roles: 
-    - name: docker_compose_zabbix
-      vars:
-      - folder: /home/user/zabbix/
-      - src: /home/boris/zabbix/docker-compose.yml
-      - dest: /home/user/zabbix/docker-compose.yml
-
 - name: zabbix-agent
   hosts:
-  - bastion
-  - webservers
+    - bastion
+    - webservers
+    - kibana
+    - elasticsearch
   gather_facts: yes
   become: yes
-  tags:
-  - zabbix_agent
   roles:
     - role: community.zabbix.zabbix_agent
       zabbix_agent_version: 6.2
       zabbix_agent_server: zabbix.ru-central1.internal
 
+- name: zabbix-agent for zabbix-server
+  hosts:
+    - zabbix
+  gather_facts: yes
+  become: yes
+  roles:
+    - role: community.zabbix.zabbix_agent
+      zabbix_agent_version: 6.2
+      zabbix_agent_server: 172.22.0.3
+
 - name: firewall zabbix agent
   hosts:
   - webservers
-  gather_facts: yes
+  gather_facts: no
   become: yes
-  tags:
-  - firewall_zabbix_agent
   tasks:
     - name: firewall zabbix agent
       ansible.builtin.iptables:
@@ -58,16 +49,54 @@
         state: saved
         path: /etc/iptables/rules.v4
 
-- name: "copy content"
+- name: docker-compose zabbix
+  hosts:
+    - zabbix
+  gather_facts: no
+  become: yes
+  roles: 
+    - name: docker_compose_zabbix
+
+- name: copy site
+  hosts: 
+   - webservers
+  gather_facts: no
+  become: yes
+  tags:
+  - copy_site
+  roles: 
+    - name: copy_site_content
+      html_dir: /var/www/html/
+      src: sibtur-travel.ru.zip
+
+- name: nginx configuration
+  hosts:
+   - webservers
+  gather_facts: no
+  become: yes
+  roles:
+    - name: nginx_config
+  
+- name: install filebeat
   hosts: 
   - webservers
   gather_facts: yes
   become: yes
-  tags:
-  - content
   roles: 
-    - name: install_git
-    - name: copy_site
-      vars:
-      - repo_link: https://github.com/bsresh/tsukushi.git
-      - dest_folder: /var/www/html/
+    - name: install_filebeat
+
+- name: docker-compose elasticsearch
+  hosts:
+  - elasticsearch
+  gather_facts: no
+  become: yes
+  roles: 
+    - name: docker_compose_elasticsearch
+
+- name: docker-compose kibana
+  hosts:
+   - kibana
+  gather_facts: no
+  become: yes
+  roles: 
+    - name: docker_compose_kibana

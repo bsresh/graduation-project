@@ -1,4 +1,0 @@
----
-# defaults file for copy_site
-repo_link: https://github.com/bsresh/tsukushi.git
-dest_folder: /var/www/html/

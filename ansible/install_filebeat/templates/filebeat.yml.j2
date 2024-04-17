@@ -1,0 +1,15 @@
+filebeat.inputs:
+- type: filestream
+  id: nginx-logs
+  paths:
+    - '/var/log/nginx/access.log'
+    - '/var/log/nginx/error.log'
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+output.elasticsearch:
+  hosts: ["elasticsearch.ru-central1.internal:9200"]
+  username: "{{username}}"
+  password: "{{password}}"
+  indices:
+    - index: "{{ansible_hostname}}-%{[agent.version]}_%{+yyyy.MM.dd}"

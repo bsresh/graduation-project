@@ -1,0 +1,25 @@
+---
+# tasks file for copy_site_content
+- name: install unzip
+  apt:
+    name:
+      - unzip
+    state: latest
+
+- name: Delete html_dir
+  file:
+    state: absent
+    dest: "{{html_dir}}"
+
+- name: Create html_dir
+  file:
+    state: directory
+    dest: "{{html_dir}}"
+    mode: 0755
+    owner: root
+    group: root
+
+- name: Extract site into /var/www/html
+  unarchive:
+    src: "{{src}}"
+    dest: "{{html_dir}}"

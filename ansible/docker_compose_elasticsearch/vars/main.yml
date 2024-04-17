@@ -1,0 +1,5 @@
+---
+# vars file for docker_compose_elasticsearch
+src: docker-compose-elasticsearch
+dest: /home/user/
+project_dir: /home/user/docker-compose-elasticsearch

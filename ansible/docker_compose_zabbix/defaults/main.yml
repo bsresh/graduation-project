@@ -1,5 +1,5 @@
 ---
 # defaults file for docker_compose_zabbix
-folder: ~/zabbix/
-src: ~/zabbix/docker-compose.yml
-dest: ~/zabbix/docker-compose.yml
+src: docker-compose-zabbix
+dest: /home/user/
+project_dir: /home/user/docker-compose-zabbix

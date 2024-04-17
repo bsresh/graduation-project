@@ -1,0 +1,4 @@
+---
+# vars file for copy_site_content
+html_dir: /var/www/html/
+src: sibtur-travel.ru.zip

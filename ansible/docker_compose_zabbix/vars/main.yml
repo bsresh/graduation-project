@@ -1,0 +1,5 @@
+---
+# vars file for docker_compose_zabbix
+src: docker-compose-zabbix
+dest: /home/user/
+project_dir: /home/user/docker-compose-zabbix

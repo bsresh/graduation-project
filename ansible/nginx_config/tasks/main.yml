@@ -1,0 +1,16 @@
+---
+# tasks file for nginx_config
+- name: "copy stub_status.conf"
+  copy:
+    src: stub_status.conf
+    dest: /etc/nginx/conf.d/stub_status.conf
+
+- name: "copy nginx.conf"
+  copy:
+    src:  nginx.conf
+    dest: /etc/nginx/nginx.conf
+
+- name: "restart nginx"
+  service:
+    name: nginx
+    state: restarted

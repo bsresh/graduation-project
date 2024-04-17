@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: elasticsearch:7.16.2
+    container_name: elasticsearch
+    volumes: 
+      - ./configs/elasticsearch/config.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    environment:
+      ES_JAVA_OPTS: "-Xmx1024m -Xms1024m"
+      ELASTIC_USERNAME: "<login>"
+      ELASTIC_PASSWORD: "<password>"
+      discovery.type: single-node
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - elk
+    restart: always
+
+networks:
+  elk:
+    driver: bridge
+
