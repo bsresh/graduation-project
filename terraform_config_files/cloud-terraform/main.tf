@@ -3,7 +3,6 @@
 locals {
   ingress_site_v4_cidr_blocks = ["0.0.0.0/0"] # С каких ip-адресов доступен сайт
   ingress_ssh_v4_cidr_blocks = ["0.0.0.0/0"] # С каких ip-адресов разрешены входящие подключения по ssh
-  scheduling_policy_preemptible = false # Сделать все машины прерываемыми
 }
 
 # Настройка провайдера
@@ -351,7 +350,7 @@ resource "yandex_compute_instance" "vm-bastion-host" {
   }
 
   scheduling_policy {
-    preemptible = true
+    preemptible = false
   }
 
   boot_disk {
@@ -398,7 +397,7 @@ resource "yandex_compute_instance" "web-server-1" {
   }
 
   scheduling_policy {
-    preemptible = true
+    preemptible = false
   }
 
   boot_disk {
@@ -444,7 +443,7 @@ resource "yandex_compute_instance" "web-server-2" {
   }
 
   scheduling_policy {
-    preemptible = true
+    preemptible = false
   }
 
   boot_disk {
@@ -490,7 +489,7 @@ resource "yandex_compute_instance" "vm-zabbix" {
   }
 
   scheduling_policy {
-    preemptible = true
+    preemptible = false
   }
 
   boot_disk {
@@ -536,7 +535,7 @@ resource "yandex_compute_instance" "vm-elasticsearch" {
   }
 
   scheduling_policy {
-    preemptible = true
+    preemptible = false
   }
 
   boot_disk {
@@ -583,7 +582,7 @@ resource "yandex_compute_instance" "vm-kibana" {
   }
 
   scheduling_policy {
-    preemptible = true
+    preemptible = false
   }
 
   boot_disk {
